@@ -392,6 +392,7 @@
       isolation: isolate;
       display: grid;
       grid-template-rows: auto minmax(0, 1fr) auto;
+      row-gap: 10px;
       align-items: center;
       justify-items: center;
       padding: max(18px, calc(env(safe-area-inset-top) + 8px)) 20px max(24px, env(safe-area-inset-bottom));
@@ -425,6 +426,7 @@
     .home-orb {
       position: relative;
       width: min(111%, 308px, 47dvh);
+      max-height: 100%;
       aspect-ratio: 1;
       display: grid;
       place-items: center;
