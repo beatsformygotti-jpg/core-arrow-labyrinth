@@ -27,6 +27,8 @@
       --paper: #faf4e6;
       --card: #fff9eb;
       --ochre: #875315;
+      --paper-grain: url("assets/sketch-paper.webp");
+      --pencil-hatch: repeating-linear-gradient(151deg, transparent 0 5px, #63534418 5px 5.8px, transparent 5.8px 9px);
     }
     * { box-sizing: border-box; }
     body {
@@ -59,14 +61,18 @@
       isolation: isolate;
       overflow: hidden;
       background: radial-gradient(ellipse at 50% 50%, #fffbef52, #d6c5a12e),
-        url("assets/sketch-paper.webp") center / 512px repeat, var(--paper);
+        var(--paper-grain) center / 512px repeat, var(--paper);
     }
     .play-surface { position: absolute; inset: 0; isolation: isolate; }
     @media (min-width: 650px) and (min-height: 480px) {
-      .phone {
+      :root {
         --display-height: min(960px, calc(100dvh - 48px));
         --display-width: calc(var(--display-height) * .43902439);
-        width: calc(var(--display-width) + 18px);
+        --phone-width: calc(var(--display-width) + 18px);
+        --side-gap: clamp(8px, calc((100vw - var(--phone-width)) / 2 - 100px), 20px);
+      }
+      .phone {
+        width: var(--phone-width);
         padding: 8px;
         border: 1px solid #443b33;
         border-radius: 37px;
@@ -264,15 +270,13 @@
       min-height: 44px;
       pointer-events: auto;
       border: 1px solid #9b702f;
-      border-radius: 9px 10px 8px 10px;
-      background: #f5dfad;
+      --button-wash: #edc37577;
       color: #523713;
-      box-shadow: 1px 2px #b69965;
       font-size: 13px;
       font-weight: 720;
     }
-    .impulse-controls button:hover, .impulse-intro button:hover { background: #fff0c5; }
-    .impulse-controls button[aria-pressed="true"] { background: #e9d9bf; }
+    .impulse-controls button:hover, .impulse-intro button:hover { --button-wash: #efba5c94; }
+    .impulse-controls button[aria-pressed="true"] { --button-wash: #c3ac837a; }
     .impulse-controls svg { width: 18px; height: 18px; }
     .visually-hidden {
       position: absolute;
@@ -292,13 +296,29 @@
       align-items: center;
       gap: 6px;
       padding: 7px 9px;
-      border-radius: 10px;
       font-size: 14px;
       font-weight: 650;
     }
-    .secondary { flex: 1; pointer-events: auto; border: 1px solid var(--line); background: var(--card); }
+    .secondary, .primary, .impulse-intro button, .impulse-controls button {
+      position: relative;
+      border-radius: 11px 8px 10px 8px / 8px 11px 8px 10px;
+      background:
+        linear-gradient(var(--button-wash, #fffbef73), var(--button-wash, #fffbef73)),
+        var(--pencil-hatch), var(--paper-grain) center / 360px repeat;
+      box-shadow: 1px 2px #78665046;
+    }
+    .secondary::after, .primary::after, .impulse-intro button::after, .impulse-controls button::after {
+      content: "";
+      position: absolute;
+      inset: 2px;
+      pointer-events: none;
+      border: 1px solid currentColor;
+      border-radius: 7px 9px 6px 8px / 7px 6px 8px 6px;
+      opacity: .2;
+    }
+    .secondary { flex: 1; pointer-events: auto; border: 1px solid var(--line); }
     .secondary .icon { color: var(--accent); }
-    .secondary:hover { border-color: #6c5b43; background: #f1e7d4; }
+    .secondary:hover:enabled { border-color: #6c5b43; --button-wash: #dad0bc72; }
     .overlay {
       position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; padding: 14px;
       background: #544a343d; backdrop-filter: blur(4px);
@@ -325,8 +345,8 @@
     .score-heading strong { color: var(--accent); font-size: 21px; font-variant-numeric: tabular-nums; }
     .score-range { margin-top: -1px; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
     .score-track { display: block; width: 100%; height: 25px; overflow: visible; }
-    .primary { border: 1px solid #756784; background: #e1d6eb; color: #423347; width: 100%; }
-    .primary:hover { background: #ebe0f1; }
+    .primary { border: 1px solid #796489; --button-wash: #ae98c980; color: #392c42; width: 100%; }
+    .primary:hover { --button-wash: #aa8dc99e; }
     .level-menu {
       width: min(calc(100% - 26px), var(--menu-width));
       max-height: min(84dvh, 680px);
@@ -336,11 +356,15 @@
       background: var(--card);
       color: var(--text);
       box-shadow: 0 20px 60px #4c3c2957;
+      overflow: visible;
+    }
+    .level-menu > section {
+      max-height: calc(min(84dvh, 680px) - 30px);
       overflow: auto;
       overscroll-behavior: contain;
     }
     .level-menu::backdrop { background: #4a3e3157; backdrop-filter: blur(4px); }
-    .pause-heading { margin-bottom: 12px; }
+    .pause-heading { min-height: 44px; margin-bottom: 12px; padding-inline-end: 98px; }
     .pause-title { margin: 0; font-size: 22px; }
     .pause-actions, .home-actions { display: grid; gap: 8px; }
     .menu-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -354,12 +378,14 @@
     .levels { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; margin: 8px 0 14px; }
     .level-button {
       display: grid; position: relative; place-items: center;
-      min-height: 43px; padding: 4px 0; border-radius: 8px;
-      border: 1px solid var(--line); background: #fff9ec;
+      min-height: 43px; padding: 4px 0; border-radius: 8px 6px 8px 7px;
+      border: 1px solid var(--line);
+      background: linear-gradient(var(--tile-wash, #fffbef70), var(--tile-wash, #fffbef70)),
+        var(--paper-grain) center / 340px repeat;
       font-size: 14px; font-weight: 740;
     }
-    .level-button:hover { background: #efe5d2; }
-    .level-button[aria-current="step"] { background: #e1d6eb; color: #423347; border-color: #756784; }
+    .level-button:hover { --tile-wash: #d9cbb779; }
+    .level-button[aria-current="step"] { --tile-wash: #ae98c980; color: #392c42; border-color: #796489; }
     .level-check { position: absolute; top: 2px; right: 3px; color: var(--green); font-size: 9px; }
     .level-check.scored { top: auto; bottom: 1px; inset-inline: 0; text-align: center; color: var(--ochre); font-size: 8px; }
     .level-button[aria-current="step"] .level-check.scored { color: #6e3e0a; }
@@ -369,28 +395,37 @@
       flex: none;
       padding: 2px;
       border: 1px solid var(--line);
-      border-radius: 10px;
-      background: var(--card);
+      border-radius: 10px 8px 9px 7px / 8px 10px 7px 9px;
+      background: var(--paper-grain) center / 360px repeat, var(--card);
+      box-shadow: 1px 2px #78665046;
     }
     .language-switch button {
       min-width: 42px;
       min-height: 38px;
       padding: 0 6px;
       border: 0;
-      border-radius: 7px;
+      border-radius: 7px 5px 6px 4px;
       background: transparent;
       color: var(--muted);
       font-size: 12px;
       font-weight: 740;
     }
-    .language-switch button:hover { background: #efe5d2; }
-    .language-switch button[aria-pressed="true"] { background: #e1d6eb; color: #423347; }
+    .language-switch button:hover { background: #ab9c8340; }
+    .language-switch button[aria-pressed="true"] {
+      background: linear-gradient(#ae98c97d, #ae98c97d), var(--pencil-hatch);
+      box-shadow: inset 0 0 0 1px #79648970;
+      color: #392c42;
+    }
+    .desktop-language { display: none; }
+    .dialog-language { position: absolute; z-index: 1; top: 14px; right: 14px; }
+    .level-menu[aria-labelledby="level-menu-title"] .dialog-language { display: none; }
     .home {
       position: absolute;
       inset: 0;
       z-index: 4;
       isolation: isolate;
       display: grid;
+      grid-template-columns: minmax(0, 1fr);
       grid-template-rows: auto minmax(0, 1fr) auto;
       row-gap: 10px;
       align-items: center;
@@ -425,7 +460,7 @@
     }
     .home-orb {
       position: relative;
-      width: min(111%, 308px, 47dvh);
+      width: min(100%, 308px, 47dvh);
       max-height: 100%;
       aspect-ratio: 1;
       display: grid;
@@ -440,7 +475,8 @@
       animation: home-aura 4.7s ease-in-out infinite alternate;
     }
     .home-orb img {
-      position: relative;
+      position: absolute;
+      inset: 0;
       display: block;
       width: 100%;
       height: 100%;
@@ -459,15 +495,10 @@
     .home-actions button {
       width: 100%;
       min-height: 48px;
-      border-radius: 13px;
       font-size: 15px;
       font-weight: 680;
       transition: background .16s, box-shadow .16s, transform .16s;
     }
-    .home-actions .primary {
-      box-shadow: 2px 3px #82718d5c, inset 0 1px #fff9f2c9;
-    }
-    .home-actions .secondary { box-shadow: 1px 2px #88785f46; }
     .home-actions button:active:enabled { transform: translateY(1px) scale(.99); }
     @media (max-height: 540px) {
       .home { padding-block: max(10px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-bottom)); }
@@ -477,6 +508,25 @@
     }
     @media (max-height: 479px) and (orientation: landscape) {
       .arena { inset: 24px 0 12px; }
+    }
+    @media (min-width: 650px) and (min-height: 480px) {
+      .home { padding-top: 38px; }
+      .home-heading .language-switch { display: none; }
+      .pause-heading { min-height: 0; padding-inline-end: 0; }
+      .desktop-language {
+        position: absolute;
+        display: inline-flex;
+        top: 18px;
+        left: calc(100% + var(--side-gap));
+      }
+      .phone:has(.level-menu[open]) > .desktop-language { visibility: hidden; }
+      .level-menu .dialog-language, .level-menu[aria-labelledby="level-menu-title"] .dialog-language {
+        position: fixed;
+        display: inline-flex;
+        top: calc((100dvh - var(--display-height) - 18px) / 2 + 18px);
+        right: auto;
+        left: calc(50% + var(--phone-width) / 2 + var(--side-gap));
+      }
     }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
@@ -631,13 +681,13 @@
       </div>
     </section>
     <dialog class="level-menu" id="level-menu" aria-labelledby="pause-title">
+      <div class="language-switch dialog-language" role="group" data-i18n-label="language">
+        <button type="button" data-language="ru" lang="ru" aria-label="Русский" aria-pressed="true">RU</button>
+        <button type="button" data-language="en" lang="en" aria-label="English" aria-pressed="false">EN</button>
+      </div>
       <section id="pause-panel">
         <header class="menu-header pause-heading">
           <h2 class="pause-title" id="pause-title" data-i18n="pause">Пауза</h2>
-          <div class="language-switch" role="group" data-i18n-label="language">
-            <button type="button" data-language="ru" lang="ru" aria-label="Русский" aria-pressed="true">RU</button>
-            <button type="button" data-language="en" lang="en" aria-label="English" aria-pressed="false">EN</button>
-          </div>
         </header>
         <div class="pause-actions">
           <button class="primary" type="button" id="resume" data-i18n="continueGame">Продолжить</button>
@@ -658,6 +708,10 @@
     </dialog>
   </main>
   <div class="phone-camera" aria-hidden="true"></div>
+  <div class="language-switch desktop-language" role="group" data-i18n-label="language">
+    <button type="button" data-language="ru" lang="ru" aria-label="Русский" aria-pressed="true">RU</button>
+    <button type="button" data-language="en" lang="en" aria-label="English" aria-pressed="false">EN</button>
+  </div>
   </div>
   <script src="assets/levels.js"></script>
   <script src="assets/locales.js"></script>
