@@ -1,0 +1,1703 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f1e3">
+  <meta name="description" content="Головоломка на порядок ходов. Проведите все стрелки к сфере в центре поля.">
+  <title>CORE — головоломка со стрелками</title>
+  <style>
+    @font-face {
+      font-family: "Space Grotesk";
+      src: url("assets/space-grotesk-core.woff2") format("woff2");
+      font-style: normal;
+      font-weight: 700;
+      font-display: swap;
+      unicode-range: U+43, U+45, U+4F, U+52;
+    }
+    :root {
+      color-scheme: light;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --text: #302b25;
+      --muted: #645949;
+      --accent: #655578;
+      --green: #355d47;
+      --red: #a93e41;
+      --line: #93856f;
+      --paper: #faf4e6;
+      --card: #fff9eb;
+      --ochre: #875315;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      background: radial-gradient(ellipse at 36% 22%, #f6eddd, #dfd5c3 75%);
+      color: var(--text);
+    }
+    button {
+      font: inherit;
+      color: inherit;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+    button:disabled { cursor: default; opacity: .45; }
+    [hidden] { display: none !important; }
+    .phone { position: relative; width: 100%; }
+    .phone-camera { display: none; }
+    .screen {
+      --menu-width: 360px;
+      width: 100%;
+      height: 100vh;
+      height: 100dvh;
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
+      background: radial-gradient(ellipse at 50% 50%, #fffbef52, #d6c5a12e),
+        url("assets/sketch-paper.webp") center / 512px repeat, var(--paper);
+    }
+    .play-surface { position: absolute; inset: 0; isolation: isolate; }
+    @media (min-width: 650px) and (min-height: 480px) {
+      .phone {
+        --display-height: min(960px, calc(100dvh - 48px));
+        --display-width: calc(var(--display-height) * .43902439);
+        width: calc(var(--display-width) + 18px);
+        padding: 8px;
+        border: 1px solid #443b33;
+        border-radius: 37px;
+        background: linear-gradient(146deg, #c8bcae, #60544d 24%, #a49889 56%, #564b44 83%, #a79888);
+        box-shadow: inset 0 0 0 2px #302822, inset 0 0 0 4px #eadccc38, 0 22px 46px #4d402b59;
+      }
+      .phone::before, .phone::after {
+        content: "";
+        position: absolute;
+        left: 100%;
+        width: 3px;
+        border-radius: 0 3px 3px 0;
+        background: linear-gradient(#8a7e72, #4e443b 12%, #a49889 86%, #4b403a);
+      }
+      .phone::before { top: 19%; height: 10%; }
+      .phone::after { top: 31%; height: 4%; }
+      .phone-camera {
+        display: grid;
+        place-items: center;
+        position: absolute;
+        z-index: 6;
+        pointer-events: none;
+        top: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 30px;
+        height: 13px;
+        border-radius: 0 0 15px 15px;
+        background: #342a24;
+      }
+      .phone-camera::after {
+        content: "";
+        width: 6px;
+        height: 6px;
+        margin-top: -1px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 39% 33%, #a3969a, #68585f 42%, #28202a 70%);
+        box-shadow: 0 0 0 1px #201a19;
+      }
+      .screen {
+        --menu-width: min(360px, calc(var(--display-width) - 24px));
+        width: var(--display-width);
+        height: var(--display-height);
+        border-radius: 26px;
+        outline: 1px solid #3d342b;
+      }
+    }
+    .hud {
+      position: absolute;
+      z-index: 3;
+      inset: max(12px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right))
+        auto max(14px, env(safe-area-inset-left));
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr);
+      align-items: start;
+      gap: 9px;
+      pointer-events: none;
+    }
+    .level-caption {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.3;
+      font-weight: 620;
+      font-variant-numeric: tabular-nums;
+    }
+    .lives { justify-self: end; display: flex; gap: 4px; padding-top: 1px; color: var(--red); }
+    .pause-trigger {
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      margin-top: -7px;
+      padding-top: 6px;
+      border: 0;
+      border-radius: 9px;
+      color: var(--muted);
+      background: transparent;
+      pointer-events: auto;
+    }
+    .pause-trigger:hover { color: var(--text); background: #a3865c24; }
+    .life-heart { width: 16px; height: 16px; }
+    .life-heart.lost { opacity: 0; animation: lose-heart .38s ease-out both; }
+    @keyframes lose-heart {
+      0% { opacity: 1; transform: scale(1); }
+      28% { opacity: 1; transform: scale(1.3); filter: brightness(1.6); }
+      100% { opacity: 0; transform: translateY(-7px) scale(.2); }
+    }
+    .arena { position: absolute; inset: 36px 0 max(4px, env(safe-area-inset-bottom)); }
+    .zoom-hint {
+      position: absolute;
+      z-index: 3;
+      top: max(53px, calc(env(safe-area-inset-top) + 43px));
+      left: 50%;
+      width: max-content;
+      max-width: calc(100% - 24px);
+      padding: 8px 13px 8px 8px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transform: translateX(-50%);
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      color: var(--text);
+      background: var(--card);
+      box-shadow: 0 4px 12px #59472a24;
+      pointer-events: none;
+      animation: zoom-hint-appear 4.8s ease both;
+    }
+    .zoom-hint p { margin: 0; font-size: 13px; font-weight: 620; line-height: 1.25; }
+    .zoom-wheel { display: none; margin-top: 3px; color: var(--muted); font-size: 11px; }
+    .pinch-icon { flex: none; width: 56px; height: 32px; }
+    .pinch-finger {
+      fill: #e4d5b9;
+      stroke: #675847;
+      stroke-width: 1.35;
+      stroke-linejoin: round;
+      transform-box: fill-box;
+      transform-origin: center bottom;
+      animation: pinch-finger 1.36s ease-in-out 3 both;
+    }
+    @keyframes pinch-finger {
+      0%, 16%, 100% { transform: translateX(-6px) rotate(19deg); }
+      64%, 80% { transform: translateX(5px) rotate(0); }
+    }
+    @keyframes zoom-hint-appear {
+      0%, 100% { opacity: 0; }
+      7%, 89% { opacity: 1; }
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .zoom-wheel { display: block; }
+    }
+    .board { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; cursor: grab; }
+    .board.is-panning, .board.is-panning .piece { cursor: grabbing; }
+    .grooves { fill: none; stroke: #756753; stroke-opacity: .14; stroke-width: 6; stroke-linecap: round; stroke-linejoin: miter; }
+    .piece { cursor: pointer; outline: none; }
+    .piece .halo { opacity: .055; transition: opacity .15s; }
+    .piece.impulse .halo { opacity: .22; }
+    .piece:focus-visible .halo { opacity: .27; }
+    @media (hover: hover) {
+      .piece:hover .halo { opacity: .27; }
+    }
+    .piece:focus-visible { color: #315747 !important; }
+    .piece.blocked { color: var(--red) !important; }
+    .piece.obstacle { color: #a94e31 !important; }
+    .piece.blocked .halo, .piece.obstacle .halo { opacity: .35; }
+    .piece.travelling { pointer-events: none; filter: brightness(.85); }
+    .piece.travelling .halo, .piece.discharging .halo { opacity: .42; }
+    .piece.travelling .body-line { stroke-width: 5.7; }
+    .piece.discharging { color: var(--ochre); }
+    .board.choosing-impulse .piece { cursor: crosshair; }
+    .board.choosing-impulse .piece:hover, .board.choosing-impulse .piece:focus-visible { color: var(--ochre) !important; }
+    #orb-shine { transform-box: fill-box; transform-origin: center; transition: transform .18s, opacity .18s; }
+    #orb-shine.pulse { transform: scale(1.5); opacity: 1; }
+    #orb-shine.charged, #orb-shine.has-impulse { fill: url(#orb-gold); opacity: 1; }
+    .impulse-intro, .impulse-controls {
+      position: absolute;
+      z-index: 3;
+      inset: auto 12px max(15px, calc(env(safe-area-inset-bottom) + 8px));
+      width: min(calc(100% - 24px), 326px);
+      margin-inline: auto;
+      text-align: center;
+    }
+    .impulse-intro {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px;
+      text-align: left;
+      border: 1px solid var(--line);
+      border-radius: 12px 10px 11px 9px;
+      background: var(--card);
+      box-shadow: 0 4px 14px #59472a29;
+    }
+    .impulse-intro strong { font-size: 14px; }
+    .impulse-intro p { margin: 4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.35; }
+    .impulse-controls { display: grid; justify-items: center; gap: 6px; pointer-events: none; }
+    .impulse-controls p {
+      margin: 0;
+      padding: 6px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--text);
+      background: var(--card);
+      font-size: 13px;
+      font-weight: 620;
+    }
+    .impulse-intro button, .impulse-controls button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 0 11px;
+      min-height: 44px;
+      pointer-events: auto;
+      border: 1px solid #9b702f;
+      border-radius: 9px 10px 8px 10px;
+      background: #f5dfad;
+      color: #523713;
+      box-shadow: 1px 2px #b69965;
+      font-size: 13px;
+      font-weight: 720;
+    }
+    .impulse-controls button:hover, .impulse-intro button:hover { background: #fff0c5; }
+    .impulse-controls button[aria-pressed="true"] { background: #e9d9bf; }
+    .impulse-controls svg { width: 18px; height: 18px; }
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .icon { width: 18px; height: 18px; flex: none; }
+    .secondary, .primary {
+      min-height: 44px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 9px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 650;
+    }
+    .secondary { flex: 1; pointer-events: auto; border: 1px solid var(--line); background: var(--card); }
+    .secondary .icon { color: var(--accent); }
+    .secondary:hover { border-color: #6c5b43; background: #f1e7d4; }
+    .overlay {
+      position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; padding: 14px;
+      background: #544a343d; backdrop-filter: blur(4px);
+    }
+    .end-card {
+      width: min(100%, 350px); padding: 22px; text-align: center;
+      background: var(--card); border: 1px solid var(--line); border-radius: 17px 14px 18px 15px;
+      box-shadow: 0 15px 40px #57472840;
+    }
+    .end-symbol { font-size: 35px; color: var(--accent); line-height: 1; margin-bottom: 9px; }
+    .end-card h2 { margin: 0; font-size: 24px; line-height: 1.12; }
+    .end-card p { margin: 9px 0 16px; color: var(--muted); font-size: 14px; line-height: 1.45; }
+    .end-rewards { margin: 16px 0 18px; text-align: left; }
+    .reward-stars { display: flex; justify-content: center; gap: 7px; margin: 0 0 14px; }
+    .reward-star { color: #aa9c82; font-size: 33px; line-height: 1; }
+    .reward-star.lit { color: #946018; text-shadow: 0 0 12px #e7ac4e4d; animation: starlight .26s ease-out both; }
+    @keyframes starlight {
+      0% { transform: scale(.74); }
+      66% { transform: scale(1.19); }
+      100% { transform: scale(1); }
+    }
+    .score-heading, .score-range { display: flex; justify-content: space-between; align-items: baseline; gap: 5px; }
+    .score-heading { font-size: 13px; color: var(--muted); }
+    .score-heading strong { color: var(--accent); font-size: 21px; font-variant-numeric: tabular-nums; }
+    .score-range { margin-top: -1px; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+    .score-track { display: block; width: 100%; height: 25px; overflow: visible; }
+    .primary { border: 1px solid #756784; background: #e1d6eb; color: #423347; width: 100%; }
+    .primary:hover { background: #ebe0f1; }
+    .level-menu {
+      width: min(calc(100% - 26px), var(--menu-width));
+      max-height: min(84dvh, 680px);
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 18px 15px 17px 16px;
+      background: var(--card);
+      color: var(--text);
+      box-shadow: 0 20px 60px #4c3c2957;
+      overflow: auto;
+      overscroll-behavior: contain;
+    }
+    .level-menu::backdrop { background: #4a3e3157; backdrop-filter: blur(4px); }
+    .pause-heading { margin-bottom: 12px; }
+    .pause-title { margin: 0; font-size: 22px; }
+    .pause-actions, .home-actions { display: grid; gap: 8px; }
+    .menu-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .menu-header h2 { margin: 0; font-size: 22px; }
+    .menu-current { margin: 0; font-size: 13px; color: var(--muted); }
+    .menu-close {
+      width: 44px; height: 44px; display: grid; place-items: center;
+      border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--muted);
+    }
+    .menu-close:hover { background: #ede2cf; color: var(--text); }
+    .levels { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; margin: 8px 0 14px; }
+    .level-button {
+      display: grid; position: relative; place-items: center;
+      min-height: 43px; padding: 4px 0; border-radius: 8px;
+      border: 1px solid var(--line); background: #fff9ec;
+      font-size: 14px; font-weight: 740;
+    }
+    .level-button:hover { background: #efe5d2; }
+    .level-button[aria-current="step"] { background: #e1d6eb; color: #423347; border-color: #756784; }
+    .level-check { position: absolute; top: 2px; right: 3px; color: var(--green); font-size: 9px; }
+    .level-check.scored { top: auto; bottom: 1px; inset-inline: 0; text-align: center; color: var(--ochre); font-size: 8px; }
+    .level-button[aria-current="step"] .level-check.scored { color: #6e3e0a; }
+    .level-button[aria-current="step"] .level-check { color: #17493f; }
+    .language-switch {
+      display: inline-flex;
+      flex: none;
+      padding: 2px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--card);
+    }
+    .language-switch button {
+      min-width: 42px;
+      min-height: 38px;
+      padding: 0 6px;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 740;
+    }
+    .language-switch button:hover { background: #efe5d2; }
+    .language-switch button[aria-pressed="true"] { background: #e1d6eb; color: #423347; }
+    .home {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      isolation: isolate;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      align-items: center;
+      justify-items: center;
+      padding: max(18px, calc(env(safe-area-inset-top) + 8px)) 20px max(24px, env(safe-area-inset-bottom));
+      background: radial-gradient(ellipse at 52% 45%, #fffaf073 0%, transparent 73%);
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+    .home-traces {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: .75;
+      z-index: -1;
+      pointer-events: none;
+    }
+    .home-heading { display: grid; width: min(100%, 296px); justify-items: center; gap: 9px; }
+    .home-heading .language-switch { justify-self: end; }
+    .home h1 {
+      position: relative;
+      margin: 0;
+      color: #3f3446;
+      font-family: "Space Grotesk", Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: clamp(43px, 10vh, 65px);
+      font-weight: 700;
+      line-height: 1.06;
+      letter-spacing: .105em;
+      text-indent: .105em;
+      text-shadow: 1px 2px #98829e3a;
+    }
+    .home-orb {
+      position: relative;
+      width: min(111%, 308px, 47dvh);
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+    }
+    .home-orb::before {
+      content: "";
+      position: absolute;
+      inset: -28%;
+      background: radial-gradient(circle, #b9a2bb3d 10%, #bc9b8b20 38%, transparent 68%);
+      animation: home-aura 4.7s ease-in-out infinite alternate;
+    }
+    .home-orb img {
+      position: relative;
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      animation: home-shimmer 4.1s ease-in-out infinite alternate;
+    }
+    @keyframes home-shimmer {
+      from { transform: translateY(2px) rotate(-.5deg); }
+      to { transform: translateY(-3px) rotate(.5deg); }
+    }
+    @keyframes home-aura {
+      from { opacity: .55; transform: scale(.88); }
+      to { opacity: 1; transform: scale(1.15); }
+    }
+    .home-actions { position: relative; width: min(100%, 296px); gap: 9px; }
+    .home-actions button {
+      width: 100%;
+      min-height: 48px;
+      border-radius: 13px;
+      font-size: 15px;
+      font-weight: 680;
+      transition: background .16s, box-shadow .16s, transform .16s;
+    }
+    .home-actions .primary {
+      box-shadow: 2px 3px #82718d5c, inset 0 1px #fff9f2c9;
+    }
+    .home-actions .secondary { box-shadow: 1px 2px #88785f46; }
+    .home-actions button:active:enabled { transform: translateY(1px) scale(.99); }
+    @media (max-height: 540px) {
+      .home { padding-block: max(10px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-bottom)); }
+      .home h1 { font-size: 40px; }
+      .home-orb { width: min(85%, 204px, 46dvh); }
+      .home-actions button { min-height: 44px; }
+    }
+    @media (max-height: 479px) and (orientation: landscape) {
+      .arena { inset: 24px 0 12px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+      .zoom-hint, .pinch-finger { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="phone">
+  <main class="screen" id="screen" aria-label="CORE">
+    <div class="play-surface" id="play-surface" hidden>
+    <header class="hud">
+      <p class="level-caption" id="level-caption"></p>
+      <button class="pause-trigger" type="button" id="level-trigger" aria-label="Меню" title="Меню (Esc)" data-i18n-label="menu" data-i18n-title="menuShortcut" aria-haspopup="dialog" aria-controls="level-menu">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M9 6v12m6-12v12"/></svg>
+      </button>
+      <div class="lives" id="lives" role="img"></div>
+    </header>
+    <div id="zoom-hint" class="zoom-hint" role="status" hidden>
+      <svg class="pinch-icon" viewBox="0 0 68 35" aria-hidden="true">
+        <defs><path id="pinch-hand" d="M9 17V5a3 3 0 0 1 6 0v9l2-2a2.8 2.8 0 0 1 4 0l2 2a3 3 0 0 1 1 2v7l-4 6h-8l-6-8a3 3 0 0 1 3-4Z"/></defs>
+        <g transform="translate(6 2)"><use class="pinch-finger" href="#pinch-hand"/></g>
+        <g transform="translate(62 2) scale(-1 1)"><use class="pinch-finger" href="#pinch-hand"/></g>
+      </svg>
+      <p><span data-i18n="pinchHint">Сведите два пальца, чтобы увидеть фигуру целиком</span>
+        <span class="zoom-wheel" data-i18n="wheelHint">Мышью — колёсико вниз</span></p>
+    </div>
+    <aside id="impulse-intro" class="impulse-intro" aria-labelledby="impulse-intro-title" hidden>
+      <div>
+        <strong id="impulse-intro-title" data-i18n="goldArrow">Золотая стрелка</strong>
+        <p data-i18n="impulseIntro">Отправьте её в ядро, чтобы получить заряд. Когда понадобится, нажмите «Импульс» и выберите стрелку, которую хотите убрать.</p>
+      </div>
+      <button type="button" id="impulse-intro-close" data-i18n="gotIt">Понятно</button>
+    </aside>
+    <div class="impulse-controls" id="impulse-controls" hidden>
+      <p id="impulse-instruction" data-i18n="impulseSelect" hidden>Выберите стрелку, которую хотите убрать</p>
+      <button type="button" id="impulse-toggle" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true">
+          <path d="m13.3 2.5-8 11h6.1l-.7 8 8-11h-6.1z"/>
+        </svg>
+        <span id="impulse-toggle-label">Импульс</span>
+      </button>
+    </div>
+    <div class="arena">
+      <svg id="board" class="board" viewBox="70 -220 600 1060" role="group" aria-label="Поле со стрелками" data-i18n-label="board">
+        <defs>
+          <radialGradient id="orb-glow">
+            <stop stop-color="#8b7890" stop-opacity=".2"/>
+            <stop offset=".45" stop-color="#9b859d" stop-opacity=".12"/>
+            <stop offset="1" stop-color="#9b859d" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="orb-gold">
+            <stop stop-color="#e2a435" stop-opacity=".68"/>
+            <stop offset=".49" stop-color="#e8b74b" stop-opacity=".48"/>
+            <stop offset="1" stop-color="#e8b74b" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <g id="grooves" class="grooves" pointer-events="none"></g>
+        <g id="preview-route" fill="none" stroke-linecap="round" stroke-linejoin="round" pointer-events="none">
+          <path id="preview-line" stroke-width="3" stroke-dasharray="3 6"/>
+        </g>
+        <circle id="orb-shine" cx="370" cy="310" r="134" fill="url(#orb-glow)" opacity=".75" pointer-events="none"/>
+        <g id="pieces"></g>
+        <g id="flight" pointer-events="none"></g>
+        <g id="orb" pointer-events="none">
+          <image href="assets/graphite-core.webp" x="337" y="277" width="66" height="66"/>
+        </g>
+      </svg>
+    </div>
+    <p class="visually-hidden" id="status" role="status"></p>
+    <div class="overlay" id="overlay" hidden role="dialog" aria-modal="false" aria-labelledby="end-title">
+      <div class="end-card">
+        <div class="end-symbol" id="end-symbol" aria-hidden="true"></div>
+        <h2 id="end-title"></h2><p id="end-text"></p>
+        <div class="end-rewards" id="end-rewards" hidden>
+          <div class="reward-stars" id="reward-stars" role="img">
+            <span class="reward-star" aria-hidden="true">★</span><span class="reward-star" aria-hidden="true">★</span><span class="reward-star" aria-hidden="true">★</span>
+          </div>
+          <div class="score-heading"><span data-i18n="efficiency">Эффективность</span><strong id="score-percent" aria-hidden="true"></strong></div>
+          <svg class="score-track" viewBox="0 0 240 25" aria-hidden="true">
+            <path d="M8 12.5H232" fill="none" stroke="#c7b9a3" stroke-width="5" stroke-linecap="round"/>
+            <path d="M82 9.5v6m75-6v6m75-6v6" fill="none" stroke="#93856f" stroke-width="1.4"/>
+            <g id="score-arrow">
+              <line id="score-shaft" x1="8" y1="12.5" y2="12.5" stroke="#776483" stroke-width="5" stroke-linecap="round"/>
+              <path id="score-tip" d="M-8 -6 0 0 -8 6Z" fill="#655578"/>
+            </g>
+          </svg>
+          <div class="score-range" aria-hidden="true"><span>0%</span><span>100%</span></div>
+          <span class="visually-hidden" id="score-summary"></span>
+        </div>
+        <button class="primary" id="end-action" type="button"></button>
+      </div>
+    </div>
+    </div>
+    <section class="home" id="home" aria-labelledby="home-title">
+      <svg class="home-traces" viewBox="0 0 720 1640" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <defs>
+          <marker id="trace-tip" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0 0 10 5 0 10Z" fill="#827473" fill-opacity=".30"/>
+          </marker>
+          <linearGradient id="traces-fade" x2="0" y2="1">
+            <stop stop-color="#827473" stop-opacity=".13"/>
+            <stop offset=".23" stop-color="#827473" stop-opacity=".32"/>
+            <stop offset=".62" stop-color="#8c7a75" stop-opacity=".25"/>
+            <stop offset="1" stop-color="#827473" stop-opacity=".09"/>
+          </linearGradient>
+        </defs>
+        <g fill="none" stroke="url(#traces-fade)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#trace-tip)">
+          <path d="M-21 150H112V96H207"/>
+          <path d="M-19 201H58V249H158V190H219"/>
+          <path d="M-19 307H103V348H183V392H260"/>
+          <path d="M-22 432H108V485H59V565H118"/>
+          <path d="M33 655H90V607H163V515H223"/>
+          <path d="M-18 758H41V845H105"/>
+          <path d="M-35 915H62V979H167V1039"/>
+          <path d="M-16 1095H87V1157H162V1215"/>
+          <path d="M23 1375V1300H101V1246H168"/>
+          <path d="M-22 1539H132V1463H222"/>
+          <path d="M744 126H635V206H542"/>
+          <path d="M737 282H603V250H501V309"/>
+          <path d="M734 352H631V417H561V477H494"/>
+          <path d="M748 542H660V488H602V567"/>
+          <path d="M736 635H639V701H582"/>
+          <path d="M740 788H623V840H553"/>
+          <path d="M740 932H666V989H584V947H541"/>
+          <path d="M736 1095H621V1051H566V1000"/>
+          <path d="M735 1204H648V1149H551V1130"/>
+          <path d="M742 1439H640V1383H589"/>
+          <path d="M739 1535H662V1579H533"/>
+        </g>
+        <g fill="#827473" opacity=".24">
+          <circle cx="103" cy="307" r="3"/><circle cx="183" cy="392" r="3"/>
+          <circle cx="90" cy="607" r="3"/><circle cx="62" cy="979" r="3"/>
+          <circle cx="635" cy="206" r="3"/><circle cx="561" cy="417" r="3"/>
+          <circle cx="623" cy="840" r="3"/><circle cx="621" cy="1095" r="3"/>
+        </g>
+      </svg>
+      <header class="home-heading">
+        <div class="language-switch" role="group" data-i18n-label="language">
+          <button type="button" data-language="ru" lang="ru" aria-label="Русский" aria-pressed="true">RU</button>
+          <button type="button" data-language="en" lang="en" aria-label="English" aria-pressed="false">EN</button>
+        </div>
+        <h1 id="home-title" lang="en">CORE</h1>
+      </header>
+      <div class="home-orb" aria-hidden="true">
+        <img src="assets/graphite-core.webp" alt="" width="640" height="640" decoding="async" fetchpriority="high">
+      </div>
+      <div class="home-actions">
+        <button class="primary" type="button" id="new-game" data-i18n="newGame">Новая игра</button>
+        <button class="secondary" type="button" id="continue-game" data-i18n="continueGame">Продолжить</button>
+        <button class="secondary" type="button" id="home-levels" data-i18n="chooseLevel">Выбрать уровень</button>
+      </div>
+    </section>
+    <dialog class="level-menu" id="level-menu" aria-labelledby="pause-title">
+      <section id="pause-panel">
+        <header class="menu-header pause-heading">
+          <h2 class="pause-title" id="pause-title" data-i18n="pause">Пауза</h2>
+          <div class="language-switch" role="group" data-i18n-label="language">
+            <button type="button" data-language="ru" lang="ru" aria-label="Русский" aria-pressed="true">RU</button>
+            <button type="button" data-language="en" lang="en" aria-label="English" aria-pressed="false">EN</button>
+          </div>
+        </header>
+        <div class="pause-actions">
+          <button class="primary" type="button" id="resume" data-i18n="continueGame">Продолжить</button>
+          <button class="secondary" type="button" id="open-levels" data-i18n="levels">Уровни</button>
+          <button class="secondary" type="button" id="open-home" data-i18n="mainMenu">В главное меню</button>
+        </div>
+      </section>
+      <section id="level-panel" hidden>
+        <header class="menu-header">
+          <h2 id="level-menu-title" data-i18n="levels">Уровни</h2>
+          <button class="menu-close" type="button" id="levels-back" aria-label="Назад" data-i18n-label="back">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+          </button>
+        </header>
+        <p class="menu-current" id="level-title"></p>
+        <div id="levels" class="levels"></div>
+      </section>
+    </dialog>
+  </main>
+  <div class="phone-camera" aria-hidden="true"></div>
+  </div>
+  <script src="assets/levels.js"></script>
+  <script src="assets/locales.js"></script>
+  <script>
+    "use strict";
+
+
+    const maximumLives = 3;
+    const center = [370, 310];
+    const unit = 47;
+    const baseScale = 24 / unit;
+    const camera = { x: center[0], y: center[1], zoom: 1 };
+    const pointers = new Map();
+    let boardBounds;
+    let gesture;
+    let zoomHintPending = false;
+    let zoomHintTimer = 0;
+    const startingCoreRadius = 2.32;
+    const minimumCoreRadius = .34;
+    const progressKey = "core-puzzle-50-completed";
+    const ratingsKey = "core-puzzle-50-stars";
+    const runKey = "core-puzzle-50-silhouettes-run-v3";
+    const impulseHintKey = "core-puzzle-impulse-hint-v1";
+    const languageKey = "core-puzzle-language";
+    const previousLevelSizes = [4, 6, 8, 11, 14, 16, 19, 21, 23, 26, 30, 33, 35, 39, 42];
+    const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+    const ui = Object.fromEntries([
+      "board", "pieces", "grooves", "flight", "preview-line", "orb-shine", "orb", "zoom-hint",
+      "level-caption", "level-title", "levels", "lives", "status",
+      "impulse-intro", "impulse-intro-close", "impulse-controls", "impulse-instruction", "impulse-toggle", "impulse-toggle-label",
+      "overlay", "end-symbol", "end-title", "end-text", "end-action", "end-rewards", "reward-stars",
+      "score-percent", "score-arrow", "score-shaft", "score-tip", "score-summary",
+      "level-trigger", "level-menu", "pause-panel", "level-panel", "home", "play-surface",
+      "resume", "open-levels", "levels-back", "open-home", "new-game", "continue-game", "home-levels",
+    ].map(id => [id, document.getElementById(id)]));
+    const languageButtons = document.querySelectorAll("[data-language]");
+
+    let current = 0;
+    let coreSize = startingCoreRadius;
+    let moves = 0;
+    let lives = maximumLives;
+    let arrows = [];
+    let occupied = new Map();
+    let generation = 0;
+    let coreRevision = 0;
+    let pulseTimer = 0;
+    const pending = new Set();
+    const activeFlights = new Map();
+    let phase = "playing";
+    let impulseState = "empty";
+    let impulseHintSeen = readStored(impulseHintKey) === true;
+    let language = readStored(languageKey) === "en" ? "en" : "ru";
+    let statusKey = "";
+    let runStarted = false;
+    const completed = readCompleted();
+    const storedRatings = readStored(ratingsKey);
+    const bestRatings = new Map(Array.isArray(storedRatings)
+      ? storedRatings.filter(entry => Array.isArray(entry) && Number.isInteger(entry[0]) && levels[entry[0]]
+        && Number.isInteger(entry[1]) && entry[1] >= 1 && entry[1] <= maximumLives)
+      : []);
+
+    function readStored(key) {
+      try { return JSON.parse(localStorage.getItem(key)); }
+      catch { return null; }
+    }
+
+    function t(key, values = {}) {
+      const message = locales[language][key] ?? "";
+      return message.replace(/\{(\w+)\}/g, (_, name) => String(values[name]));
+    }
+
+    function levelName(level) {
+      return language === "en" ? englishLevelTitles[level.title] ?? level.title : level.title;
+    }
+
+    function applyLanguage() {
+      document.documentElement.lang = language;
+      document.title = t("title");
+      document.querySelector('meta[name="description"]').content = t("description");
+      for (const node of document.querySelectorAll("[data-i18n]")) {
+        node.textContent = t(node.dataset.i18n);
+      }
+      for (const node of document.querySelectorAll("[data-i18n-label]")) {
+        node.setAttribute("aria-label", t(node.dataset.i18nLabel));
+      }
+      for (const node of document.querySelectorAll("[data-i18n-title]")) {
+        node.title = t(node.dataset.i18nTitle);
+      }
+      for (const button of languageButtons) {
+        button.setAttribute("aria-pressed", String(button.dataset.language === language));
+      }
+      updateLevelCopy();
+      updateLevelList();
+      updateCounters();
+      for (const arrow of arrows) arrow.drawing.root.setAttribute("aria-label", arrowLabel(arrow));
+      setImpulseState(impulseState);
+      if (phase !== "playing") renderEndCopy(phase === "won");
+      setStatus(statusKey);
+    }
+
+    function previousLevelIndex(index) {
+      if (!Number.isInteger(index) || previousLevelSizes[index] === undefined) return null;
+      const size = previousLevelSizes[index];
+      return levels.findIndex(level => level.shapes.length === size);
+    }
+
+    function readCompleted() {
+      const stored = readStored(progressKey);
+      if (Array.isArray(stored)) return new Set(stored.filter(index => Number.isInteger(index) && levels[index]));
+      const previous = readStored("core-puzzle-redmi-completed");
+      return new Set(Array.isArray(previous)
+        ? previous.map(previousLevelIndex).filter(index => index !== null && index >= 0)
+        : []);
+    }
+
+    function element(name, attrs) {
+      const node = document.createElementNS("http://www.w3.org/2000/svg", name);
+      for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+      return node;
+    }
+
+    function expand(points) {
+      const [first, second] = points;
+      const diagonal = first[0] !== second[0] && first[1] !== second[1];
+      // The rotated grid uses one diagonal per unit square, so two paths
+      // can intersect only at a grid vertex checked by the collision logic.
+      if (diagonal && (first[0] + first[1]) % 2 !== 0) {
+        throw new Error("Стрелка за пределами диагональной сетки");
+      }
+      const cells = [points[0]];
+      for (let index = 1; index < points.length; index++) {
+        const [x, y] = points[index - 1];
+        const [targetX, targetY] = points[index];
+        const dx = targetX - x;
+        const dy = targetY - y;
+        const steps = Math.max(Math.abs(dx), Math.abs(dy));
+        if (!steps || (diagonal ? Math.abs(dx) !== Math.abs(dy) : dx && dy)) {
+          throw new Error("Стрелка должна идти по клеткам с прямыми углами");
+        }
+        for (let step = 1; step <= steps; step++) {
+          cells.push([x + Math.sign(dx) * step, y + Math.sign(dy) * step]);
+        }
+      }
+      return cells;
+    }
+
+    function buildLevel(level) {
+      const owners = new Map();
+      const pieces = level.shapes.map((shape, id) => {
+        const cells = expand(shape.split(" ").map(point => point.split(",").map(Number)));
+        const [x, y] = cells.at(-1);
+        const [previousX, previousY] = cells.at(-2);
+        const dx = x - previousX;
+        const dy = y - previousY;
+        if (x * dy !== y * dx || x * dx + y * dy >= 0) {
+          throw new Error("Стрелка не направлена в ядро: " + id);
+        }
+        const route = expand([[x, y], [0, 0]]);
+        const impulse = level.impulse === id;
+        const color = impulse ? "#985717" : pencilColor(level.palette[id % level.palette.length]);
+        const cellStep = Math.hypot(dx, dy) * unit;
+        const arrow = { id, cells, route, color, impulse, cellStep, removed: false, activity: "idle" };
+        const forward = new Set(route.slice(1).map(String));
+        for (const point of cells) {
+          if (owners.has(String(point)) || Math.hypot(...point) <= startingCoreRadius) {
+            throw new Error("Стрелки пересекаются: " + point);
+          }
+          if (forward.has(String(point))) {
+            throw new Error("Стрелка перекрывает собственный путь: " + (id + 1));
+          }
+          owners.set(String(point), arrow);
+        }
+        return arrow;
+      });
+      validateSolution(pieces, owners, level.title);
+      return { pieces, owners };
+    }
+
+    function validateSolution(pieces, owners, title) {
+      const remaining = new Set(pieces);
+      const cells = new Map(owners);
+      while (remaining.size) {
+        const next = [...remaining].find(arrow => !blocker(arrow, cells));
+        if (!next) throw new Error("Тупик на уровне «" + title + "»");
+        remaining.delete(next);
+        for (const cell of next.cells) cells.delete(String(cell));
+      }
+    }
+
+    function pencilColor(tint) {
+      const graphite = [38, 33, 30];
+      const channels = graphite.map((value, index) => {
+        const start = 1 + index * 2;
+        return Math.round(value * .78 + parseInt(tint.slice(start, start + 2), 16) * .22);
+      });
+      return "rgb(" + channels.join(",") + ")";
+    }
+
+    function toPixels([x, y]) {
+      return [center[0] + x * unit, center[1] + y * unit];
+    }
+
+    function path(points) {
+      return points.map(([x, y], index) => (index ? "L" : "M") + x.toFixed(2) + " " + y.toFixed(2)).join(" ");
+    }
+
+    function turnsOnly(cells) {
+      return cells.filter(([x, y], index) => {
+        if (index === 0 || index === cells.length - 1) return true;
+        const [previousX, previousY] = cells[index - 1];
+        const [nextX, nextY] = cells[index + 1];
+        return x - previousX !== nextX - x || y - previousY !== nextY - y;
+      });
+    }
+
+    function measure(points) {
+      const lengths = [0];
+      for (let index = 1; index < points.length; index++) {
+        const [x, y] = points[index];
+        const [lastX, lastY] = points[index - 1];
+        lengths.push(lengths.at(-1) + Math.hypot(x - lastX, y - lastY));
+      }
+      return { points, lengths, total: lengths.at(-1) };
+    }
+
+    function locate(line, distance) {
+      const { points, lengths } = line;
+      if (distance <= 0) return points[0];
+      if (distance >= line.total) return points.at(-1);
+      const endIndex = lengths.findIndex(length => length >= distance);
+      const start = points[endIndex - 1];
+      const end = points[endIndex];
+      const fraction = (distance - lengths[endIndex - 1]) / (lengths[endIndex] - lengths[endIndex - 1]);
+      return start.map((value, index) => value + (end[index] - value) * fraction);
+    }
+
+    function segment(line, start, end) {
+      const middle = line.points.filter((_, index) => line.lengths[index] > start && line.lengths[index] < end);
+      return [locate(line, start), ...middle, locate(line, end)];
+    }
+
+    function makeDrawing(arrow) {
+      const root = element("g", {
+        color: arrow.color,
+        class: arrow.impulse ? "piece impulse" : "piece",
+        role: "button",
+        "aria-label": arrowLabel(arrow),
+        tabindex: "0",
+      });
+      root.dataset.arrow = arrow.id;
+      const base = { fill: "none", "stroke-linecap": "round", "stroke-linejoin": "miter" };
+      const hit = element("path", { ...base, stroke: "transparent", "stroke-width": unit * .92 });
+      const halo = element("path", { ...base, stroke: "currentColor", "stroke-width": 13, class: "halo" });
+      const line = element("path", { ...base, stroke: "currentColor", "stroke-width": 4.5, class: "body-line" });
+      const tip = element("path", { fill: "currentColor" });
+      const tail = element(arrow.impulse ? "path" : "circle", arrow.impulse
+        ? { d: "M0 -7 5 0 0 7 -5 0 Z", fill: "currentColor" }
+        : { r: 3.35, fill: "currentColor" });
+      root.append(hit, halo, line, tip, tail);
+      return { root, hit, halo, line, tip, tail, impulse: arrow.impulse };
+    }
+
+    function paint(drawing, line, start, end, showTip = true) {
+      const span = end - start;
+      const depth = showTip ? Math.min(13, span * .8) : 0;
+      if (showTip) {
+        const head = locate(line, end);
+        const previous = locate(line, end - Math.min(2, span / 3));
+        const length = Math.hypot(head[0] - previous[0], head[1] - previous[1]);
+        const dx = (head[0] - previous[0]) / length;
+        const dy = (head[1] - previous[1]) / length;
+        const width = depth * 7.5 / 13;
+        const back = [head[0] - dx * depth, head[1] - dy * depth];
+        const wingA = [back[0] - dy * width, back[1] + dx * width];
+        const wingB = [back[0] + dy * width, back[1] - dx * width];
+        drawing.tip.setAttribute("d", path([head, wingA, wingB]) + " Z");
+      } else drawing.tip.setAttribute("d", "");
+      const trail = path(segment(line, start, end - depth * .54));
+      drawing.halo.setAttribute("d", trail);
+      drawing.line.setAttribute("d", trail);
+      const [x, y] = locate(line, start);
+      if (drawing.impulse) drawing.tail.setAttribute("transform", "translate(" + x + " " + y + ")");
+      else {
+        drawing.tail.setAttribute("cx", x);
+        drawing.tail.setAttribute("cy", y);
+      }
+    }
+
+    function blocker(arrow, owners = occupied) {
+      for (let index = 1; index < arrow.route.length; index++) {
+        const candidate = owners.get(String(arrow.route[index]));
+        if (candidate) return { arrow: candidate, index };
+      }
+      return null;
+    }
+
+    function sizeFor(remaining, total) {
+      const ratio = remaining / total;
+      return minimumCoreRadius + (startingCoreRadius - minimumCoreRadius) * ratio ** .82;
+    }
+
+    function paintCore(size) {
+      coreSize = size;
+      const scale = size * unit / 33;
+      ui.orb.setAttribute("transform", "translate(370 310) scale(" + scale + ") translate(-370 -310)");
+      ui["orb-shine"].setAttribute("r", (size + .9) * unit);
+    }
+
+    function shrinkCore() {
+      const revision = ++coreRevision;
+      const from = coreSize;
+      const to = sizeFor(arrows.filter(arrow => !arrow.removed).length, arrows.length);
+      return animate(150, progress => {
+        const eased = 1 - (1 - progress) ** 3;
+        if (revision === coreRevision) paintCore(from + (to - from) * eased);
+      });
+    }
+
+    function drawGuide(arrow, obstacle) {
+      const points = arrow.route.slice(0, obstacle.index + 1).map(toPixels);
+      ui["preview-line"].setAttribute("d", path(points));
+      ui["preview-line"].setAttribute("stroke", "#aa4443");
+    }
+
+    function arrowLabel(arrow) {
+      return t(arrow.impulse ? "goldArrowLabel" : "arrowLabel", { number: arrow.id + 1 });
+    }
+
+    function setStatus(key) {
+      statusKey = key;
+      ui.status.textContent = t(key);
+    }
+
+    function updateCounters() {
+      ui.lives.setAttribute("aria-label", t("lives", { number: lives, total: maximumLives }));
+      for (const [index, heart] of Array.from(ui.lives.children).entries()) {
+        heart.classList.toggle("lost", index >= lives);
+      }
+    }
+
+    function updateLevelCopy() {
+      ui["level-caption"].textContent = t("level", { number: current + 1 });
+      ui["level-title"].textContent = levelName(levels[current]);
+    }
+
+    function updateLevelList() {
+      for (const [index, button] of [...ui.levels.children].entries()) {
+        if (index === current) button.setAttribute("aria-current", "step");
+        else button.removeAttribute("aria-current");
+        const score = bestRatings.get(index);
+        const mark = button.querySelector(".level-check");
+        mark.classList.toggle("scored", !!score);
+        mark.textContent = score ? "★".repeat(score) : completed.has(index) ? "✓" : "";
+        const result = score ? t("stars", { number: score, total: maximumLives })
+          : completed.has(index) ? t("completed") : "";
+        const level = levels[index];
+        const title = levelName(level);
+        button.title = title + " · " + t(level.difficulty);
+        button.setAttribute("aria-label", [t("level", { number: index + 1 }), title, result].filter(Boolean).join(". "));
+      }
+    }
+
+    function clearGuide() {
+      ui["preview-line"].setAttribute("d", "");
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function minimumZoom({ width, height }) {
+      const boardWidth = boardBounds.right - boardBounds.left + 2 * unit;
+      const boardHeight = boardBounds.bottom - boardBounds.top + 2 * unit;
+      return Math.min(.75, width / (baseScale * boardWidth), height / (baseScale * boardHeight));
+    }
+
+    function panLimit(value, middle, first, last, halfSpan) {
+      // Keep the starting center reachable even on asymmetric boards.
+      const margin = Math.min(2 * unit, halfSpan * .24);
+      return clamp(value, Math.min(middle, first + halfSpan) - margin,
+        Math.max(middle, last - halfSpan) + margin);
+    }
+
+    function hideZoomHint() {
+      clearTimeout(zoomHintTimer);
+      ui["zoom-hint"].hidden = true;
+    }
+
+    function showZoomHint(left, top, width, height) {
+      if (!zoomHintPending || phase !== "playing" || !arenaActive()) return;
+      const clipped = boardBounds.left < left || boardBounds.right > left + width
+        || boardBounds.top < top || boardBounds.bottom > top + height;
+      if (!clipped) return;
+      zoomHintPending = false;
+      ui["zoom-hint"].hidden = false;
+      zoomHintTimer = setTimeout(hideZoomHint, 4800);
+    }
+
+    function drawCamera(rect = ui.board.getBoundingClientRect()) {
+      if (!boardBounds || !rect.width || !rect.height) return;
+      const scale = baseScale * camera.zoom;
+      const width = rect.width / scale;
+      const height = rect.height / scale;
+      camera.x = panLimit(camera.x, center[0], boardBounds.left, boardBounds.right, width / 2);
+      camera.y = panLimit(camera.y, center[1], boardBounds.top, boardBounds.bottom, height / 2);
+      const left = camera.x - width / 2;
+      const top = camera.y - height / 2;
+      ui.board.setAttribute("viewBox", [left, top, width, height].join(" "));
+      showZoomHint(left, top, width, height);
+    }
+
+    function moveCamera(from, to, factor = 1) {
+      const rect = ui.board.getBoundingClientRect();
+      const middleX = rect.left + rect.width / 2;
+      const middleY = rect.top + rect.height / 2;
+      const previousScale = baseScale * camera.zoom;
+      const minimum = minimumZoom(rect);
+      camera.zoom = clamp(camera.zoom * factor, minimum, 3);
+      zoomHintPending = false;
+      if (factor < 1) hideZoomHint();
+      const scale = baseScale * camera.zoom;
+      camera.x += (from.x - middleX) / previousScale - (to.x - middleX) / scale;
+      camera.y += (from.y - middleY) / previousScale - (to.y - middleY) / scale;
+      if (factor < 1 && camera.zoom === minimum) {
+        const halfWidth = rect.width / (2 * scale) - unit / 2;
+        const halfHeight = rect.height / (2 * scale) - unit / 2;
+        camera.x = clamp(camera.x, boardBounds.right - halfWidth, boardBounds.left + halfWidth);
+        camera.y = clamp(camera.y, boardBounds.bottom - halfHeight, boardBounds.top + halfHeight);
+      }
+      drawCamera(rect);
+    }
+
+    function pointerPosition(event) {
+      return { x: event.clientX, y: event.clientY };
+    }
+
+    function gestureFrame() {
+      const [first, second] = pointers.values();
+      if (!second) return { point: first, span: 0 };
+      return {
+        point: { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 },
+        span: Math.hypot(second.x - first.x, second.y - first.y),
+      };
+    }
+
+    function clearGesture() {
+      for (const id of pointers.keys()) {
+        if (ui.board.hasPointerCapture(id)) ui.board.releasePointerCapture(id);
+      }
+      pointers.clear();
+      gesture = null;
+      ui.board.classList.remove("is-panning");
+    }
+
+    function startGesture(event) {
+      if (event.button !== 0 || !arenaActive() || phase !== "playing") return;
+      pointers.set(event.pointerId, pointerPosition(event));
+      ui.board.setPointerCapture(event.pointerId);
+      const frame = gestureFrame();
+      if (!gesture) {
+        gesture = { arrow: targetArrow(event), start: frame.point, frame, moved: false };
+      } else {
+        gesture.moved = true;
+        gesture.frame = frame;
+        ui.board.classList.add("is-panning");
+      }
+    }
+
+    function updateGesture(event) {
+      if (!pointers.has(event.pointerId)) return;
+      pointers.set(event.pointerId, pointerPosition(event));
+      const frame = gestureFrame();
+      if (!gesture.moved) {
+        if (Math.hypot(frame.point.x - gesture.start.x, frame.point.y - gesture.start.y) < 6) return;
+        gesture.moved = true;
+        ui.board.classList.add("is-panning");
+      }
+      const previous = gesture.frame;
+      const factor = frame.span > 0 && previous.span > 0 ? frame.span / previous.span : 1;
+      moveCamera(previous.point, frame.point, factor);
+      gesture.frame = frame;
+    }
+
+    function endGesture(event) {
+      if (!pointers.has(event.pointerId)) return;
+      const released = event.type === "pointerup";
+      if (released) updateGesture(event);
+      const arrow = released && !gesture.moved ? gesture.arrow : null;
+      pointers.delete(event.pointerId);
+      if (pointers.size) gesture.frame = gestureFrame();
+      else clearGesture();
+      if (arrow) void useArrow(arrow, false);
+    }
+
+    function loadLevel(index, focusBoard = false) {
+      generation++;
+      coreRevision++;
+      clearTimeout(pulseTimer);
+      current = index;
+      pending.clear();
+      activeFlights.clear();
+      phase = "playing";
+      moves = 0;
+      lives = maximumLives;
+      clearGuide();
+      ui.overlay.hidden = true;
+      ui.flight.replaceChildren();
+      ui.grooves.replaceChildren();
+      ui.pieces.replaceChildren();
+      ui["orb-shine"].classList.remove("pulse", "charged");
+      ui["impulse-intro"].hidden = true;
+      setImpulseState("empty");
+      hideZoomHint();
+      zoomHintPending = true;
+      const level = levels[index];
+      const layout = buildLevel(level);
+      arrows = layout.pieces;
+      occupied = layout.owners;
+      clearGesture();
+      const points = arrows.flatMap(arrow => arrow.cells.map(toPixels));
+      const xs = points.map(([x]) => x);
+      const ys = points.map(([, y]) => y);
+      boardBounds = {
+        left: Math.min(center[0], ...xs), right: Math.max(center[0], ...xs),
+        top: Math.min(center[1], ...ys), bottom: Math.max(center[1], ...ys),
+      };
+      Object.assign(camera, { x: center[0], y: center[1], zoom: 1 });
+      drawCamera();
+      paintCore(startingCoreRadius);
+      for (const arrow of arrows) {
+        arrow.line = measure(turnsOnly(arrow.cells).map(toPixels));
+        arrow.course = measure([...arrow.line.points, center]);
+        arrow.drawing = makeDrawing(arrow);
+        arrow.drawing.hit.setAttribute("d", path(arrow.line.points));
+        paint(arrow.drawing, arrow.line, 0, arrow.line.total);
+        ui.grooves.append(element("path", { d: path(arrow.line.points) }));
+        ui.pieces.append(arrow.drawing.root);
+      }
+      updateLevelCopy();
+      setStatus(level.intro || "");
+      updateCounters();
+      updateLevelList();
+      showImpulseIntro();
+      if (focusBoard) arrows[0].drawing.root.focus({ preventScroll: true });
+    }
+
+    function arenaActive() {
+      return ui.home.hidden && !ui["level-menu"].open;
+    }
+
+    function runFrames(step) {
+      return new Promise(resolve => {
+        const token = generation;
+        let previous = performance.now();
+        function tick(now) {
+          if (token !== generation) return resolve(false);
+          const delta = Math.max(0, Math.min(now - previous, 45));
+          previous = now;
+          if (arenaActive() && step(delta)) resolve(true);
+          else requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+      });
+    }
+
+    function animate(duration, draw, reducedDuration = 1) {
+      const time = reducedMotion.matches ? reducedDuration : duration;
+      let elapsed = 0;
+      return runFrames(delta => {
+        elapsed += delta;
+        const progress = Math.min(1, elapsed / time);
+        draw(progress);
+        return progress === 1;
+      });
+    }
+
+    function paintScore(percent) {
+      ui["score-percent"].textContent = percent + "%";
+      const position = 8 + percent * 2.24;
+      ui["score-arrow"].setAttribute("visibility", percent > 0 ? "visible" : "hidden");
+      ui["score-shaft"].setAttribute("x2", Math.max(8, position - 5));
+      ui["score-tip"].setAttribute("transform", "translate(" + position + " 12.5)");
+      for (const [index, star] of Array.from(ui["reward-stars"].children).entries()) {
+        star.classList.toggle("lit", percent >= Math.round(100 * (index + 1) / maximumLives));
+      }
+    }
+
+    function finishLevel(won, animateScore = true) {
+      phase = won ? "won" : "lost";
+      hideZoomHint();
+      ui["impulse-intro"].hidden = true;
+      setImpulseState("empty");
+      ui["end-symbol"].hidden = won;
+      ui["end-text"].hidden = won;
+      ui["end-rewards"].hidden = !won;
+      if (won) {
+        const efficiency = Math.round(100 * lives / maximumLives);
+        bestRatings.set(current, Math.max(lives, bestRatings.get(current) || 0));
+        completed.add(current);
+        try {
+          localStorage.setItem(progressKey, JSON.stringify([...completed]));
+          localStorage.setItem(ratingsKey, JSON.stringify([...bestRatings]));
+        } catch {}
+        paintScore(animateScore ? 0 : efficiency);
+        if (animateScore) void animate(650, progress => {
+          paintScore(Math.round(efficiency * (1 - (1 - progress) ** 2)));
+        });
+        updateLevelList();
+      }
+      ui["end-symbol"].textContent = "♡";
+      renderEndCopy(won);
+      ui.overlay.hidden = false;
+      ui["end-action"].focus({ preventScroll: true });
+      setStatus(won ? "allArrowsInCore" : "collisionLost");
+    }
+
+    function renderEndCopy(won) {
+      const final = current === levels.length - 1;
+      ui["end-title"].textContent = t(won ? "levelWon" : "levelLost");
+      ui["end-text"].textContent = t("retryHint");
+      ui["end-action"].textContent = t(won && !final ? "nextLevel" : "playAgain");
+      if (!won) return;
+      ui["reward-stars"].setAttribute("aria-label", t("stars", { number: lives, total: maximumLives }));
+      ui["score-summary"].textContent = t("scoreSummary", { number: Math.round(100 * lives / maximumLives) })
+        + (completed.size === levels.length ? " " + t("allComplete") : "");
+    }
+
+    function vacate(arrow) {
+      for (const cell of arrow.cells) {
+        if (occupied.get(String(cell)) === arrow) occupied.delete(String(cell));
+      }
+    }
+
+    function absorb(arrow) {
+      arrow.drawing.root.remove();
+      arrow.removed = true;
+      arrow.activity = "removed";
+      vacate(arrow);
+    }
+
+    function pulseCore(charged = false) {
+      const glow = ui["orb-shine"];
+      clearTimeout(pulseTimer);
+      glow.classList.toggle("charged", charged);
+      glow.classList.add("pulse");
+      pulseTimer = setTimeout(() => glow.classList.remove("pulse", "charged"), charged ? 560 : 180);
+    }
+
+    function setImpulseState(state) {
+      impulseState = state;
+      const selecting = state === "selecting";
+      const available = phase === "playing" && (state === "ready" || selecting);
+      ui["impulse-controls"].hidden = !available;
+      ui["impulse-toggle"].setAttribute("aria-pressed", String(selecting));
+      ui["impulse-toggle-label"].textContent = t(selecting ? "cancel" : "impulse");
+      ui["impulse-instruction"].hidden = !selecting;
+      ui["orb-shine"].classList.toggle("has-impulse", available);
+      ui.board.classList.toggle("choosing-impulse", selecting);
+    }
+
+    function showImpulseIntro() {
+      if (impulseHintSeen || phase !== "playing" || !arenaActive()
+          || !arrows.some(arrow => arrow.impulse && !arrow.removed)) return;
+      ui["impulse-intro"].hidden = false;
+      impulseHintSeen = true;
+      try { localStorage.setItem(impulseHintKey, "true"); }
+      catch {}
+    }
+
+    function useArrow(arrow, keyboard) {
+      return impulseState === "selecting" ? dischargeImpulse(arrow, keyboard) : fire(arrow, keyboard);
+    }
+
+    async function dischargeImpulse(target, keyboard) {
+      if (impulseState !== "selecting" || !target || target.activity !== "idle"
+          || phase !== "playing" || !lives || !arenaActive()) return;
+      const token = generation;
+      setImpulseState("spending");
+      pending.add(target);
+      moves++;
+      clearGuide();
+      pulseCore(true);
+      setStatus("impulseBlast");
+      target.activity = "dissolving";
+      target.drawing.root.classList.add("discharging");
+      const count = Math.min(14, target.cells.length * 2);
+      const sparks = element("g", { fill: "#ad6c27", "pointer-events": "none" });
+      const fragments = Array.from({ length: count }, (_, index) => {
+        const dot = element("circle", { r: 2.8 + index % 3 });
+        const start = locate(target.line, target.line.total * index / (count - 1));
+        const angle = index * 2.4;
+        const reach = 14 + (index % 4) * 5;
+        const offset = [Math.cos(angle) * reach, Math.sin(angle) * reach];
+        sparks.append(dot);
+        return { dot, start, offset };
+      });
+      ui.flight.append(sparks);
+      let released = false;
+      await animate(530, progress => {
+        const burst = Math.max(0, Math.min(1, (progress - .15) / .34));
+        const pull = Math.max(0, (progress - .40) / .60) ** 1.3;
+        target.drawing.root.style.opacity = (1 - burst) ** 2;
+        if (!released && burst >= .72) {
+          vacate(target);
+          released = true;
+        }
+        for (const { dot, start, offset } of fragments) {
+          const [x, y] = start.map((value, index) => {
+            const at = value + offset[index] * burst;
+            return at * (1 - pull) + center[index] * pull;
+          });
+          dot.setAttribute("cx", x);
+          dot.setAttribute("cy", y);
+          dot.setAttribute("opacity", burst * (1 - pull * .85));
+        }
+      }, 320);
+      if (token !== generation) return;
+      sparks.remove();
+      absorb(target);
+      setImpulseState("empty");
+      saveRun();
+      await shrinkCore();
+      if (token !== generation) return;
+      setStatus("impulseRemoved");
+      settleTurn(target, keyboard);
+    }
+
+    function flightLimits(arrow) {
+      const limits = [];
+      const clearance = Math.min(6, unit * .38);
+      for (const flight of activeFlights.values()) {
+        // An earlier flight owns shared cells until its tail has cleared them.
+        for (let index = 1; index < arrow.route.length - 1; index++) {
+          const at = flight.distances.get(String(arrow.route[index]));
+          if (at !== undefined && flight.tail < at + clearance) {
+            limits.push({ flight, clearsAt: at + clearance, stopsAt: index * arrow.cellStep - clearance });
+          }
+        }
+      }
+      return limits;
+    }
+
+    function clearTravel(limits) {
+      let limit = Infinity;
+      for (const { flight, clearsAt, stopsAt } of limits) {
+        if (!flight.done && flight.tail < clearsAt) limit = Math.min(limit, stopsAt);
+      }
+      return limit;
+    }
+
+    async function fly(arrow, limits) {
+      const token = generation;
+      const { course, drawing } = arrow;
+      const length = arrow.line.total;
+      const flight = {
+        tail: 0,
+        done: false,
+        distances: new Map([...arrow.cells, ...arrow.route.slice(1)]
+          .map((cell, index) => [String(cell), index * arrow.cellStep])),
+      };
+      activeFlights.set(arrow, flight);
+      vacate(arrow);
+      drawing.root.classList.add("travelling");
+      drawing.root.setAttribute("tabindex", "-1");
+      ui.flight.append(drawing.root);
+      drawing.root.setAttribute("aria-hidden", "true");
+      const capture = course.total - coreSize * unit;
+      const duration = Math.min(950, Math.max(340, 160 + capture * 1.10));
+      const speed = capture / (reducedMotion.matches ? Math.min(duration, 300) : duration);
+      let arrived = false;
+      await runFrames(delta => {
+        const rim = course.total - coreSize * unit;
+        flight.tail = Math.min(rim, Math.max(flight.tail, Math.min(flight.tail + speed * delta, clearTravel(limits))));
+        const tip = flight.tail + length;
+        const showTip = tip < rim;
+        const visibleEnd = Math.min(tip, rim + 1);
+        if (visibleEnd - flight.tail > 1.5) paint(drawing, course, flight.tail, visibleEnd, showTip);
+        else drawing.root.style.opacity = "0";
+        if (!arrived && !showTip) {
+          arrived = true;
+          pulseCore();
+        }
+        return flight.tail >= rim;
+      });
+      if (token !== generation) return;
+      flight.done = true;
+      activeFlights.delete(arrow);
+      absorb(arrow);
+      await shrinkCore();
+    }
+
+    function settleTurn(arrow, keyboard) {
+      pending.delete(arrow);
+      if (!pending.size) {
+        if (!lives) finishLevel(false);
+        else if (arrows.every(piece => piece.removed)) finishLevel(true);
+        saveRun();
+      }
+      if (keyboard && phase === "playing" && lives && arenaActive() && document.activeElement === document.body) {
+        arrows.find(piece => piece.activity === "idle")?.drawing.root.focus({ preventScroll: true });
+      }
+    }
+
+    async function fire(arrow, keyboard) {
+      if (!arrow || arrow.activity !== "idle" || !lives || phase !== "playing" || !arenaActive()) return;
+      const token = generation;
+      const obstacle = blocker(arrow);
+      const limits = flightLimits(arrow);
+      const length = arrow.line.total;
+      const course = arrow.course;
+      clearGuide();
+      pending.add(arrow);
+      arrow.activity = obstacle ? "bouncing" : "flying";
+      moves++;
+
+      if (obstacle) {
+        lives--;
+        drawGuide(arrow, obstacle);
+        arrow.drawing.root.classList.add("blocked");
+        obstacle.arrow.drawing.root.classList.add("obstacle");
+        setStatus("pathBlocked");
+        updateCounters();
+        const travel = obstacle.index * arrow.cellStep - Math.min(9, unit * .42);
+        await animate(Math.min(355, 180 + travel * .50), progress => {
+          const excursion = progress <= .45 ? progress / .45 : (1 - progress) / .55;
+          const distance = Math.min(travel * (1 - (1 - excursion) ** 2), clearTravel(limits));
+          paint(arrow.drawing, course, distance, distance + length);
+        }, 180);
+        if (generation !== token) return;
+        arrow.activity = "idle";
+        arrow.drawing.root.classList.remove("blocked");
+        obstacle.arrow.drawing.root.classList.remove("obstacle");
+      } else {
+        setStatus("arrowFlying");
+        await fly(arrow, limits);
+        if (generation !== token) return;
+        if (arrow.impulse) {
+          ui["impulse-intro"].hidden = true;
+          setImpulseState("ready");
+          pulseCore(true);
+          setStatus("chargeReady");
+          saveRun();
+        } else setStatus("arrowArrived");
+      }
+
+      settleTurn(arrow, keyboard);
+    }
+
+    function saveRun() {
+      if (!runStarted) return;
+      try {
+        const removed = arrows.filter(arrow => arrow.removed).map(arrow => arrow.id);
+        const impulseReady = impulseState !== "empty";
+        localStorage.setItem(runKey, JSON.stringify({ current, lives, moves, removed, impulseReady }));
+      } catch {}
+    }
+
+    function loadRun() {
+      let saved = readStored(runKey);
+      if (!saved) {
+        const legacy = readStored("core-puzzle-centered-run-v1");
+        const index = ["core-puzzle-50-silhouettes-run-v2", "core-puzzle-50-silhouettes-run-v1", "core-puzzle-50-run-v1"]
+          .map(key => readStored(key)?.current)
+          .find(value => Number.isInteger(value) && levels[value])
+          ?? previousLevelIndex(legacy?.current);
+        // Arrow IDs refer to a different layout in the previous campaign.
+        if (index !== null && index >= 0) saved = { current: index, lives: maximumLives, moves: 0, removed: [] };
+      }
+      runStarted = !!saved && Number.isInteger(saved.current) && !!levels[saved.current]
+        && Number.isInteger(saved.lives) && saved.lives >= 0 && saved.lives <= maximumLives
+        && Number.isInteger(saved.moves) && saved.moves >= 0 && Array.isArray(saved.removed)
+        && saved.removed.every(id => Number.isInteger(id) && id >= 0 && id < levels[saved.current].shapes.length);
+      loadLevel(runStarted ? saved.current : 0);
+      if (!runStarted) return;
+      for (const id of new Set(saved.removed)) absorb(arrows[id]);
+      lives = saved.lives;
+      moves = saved.moves;
+      // Later boards gain their first gold arrow in this release.
+      const migratedCharge = saved.impulseReady === undefined && current >= 7;
+      if ((saved.impulseReady === true || migratedCharge) && arrows.some(arrow => arrow.impulse && arrow.removed)) {
+        setImpulseState("ready");
+      }
+      paintCore(sizeFor(arrows.filter(arrow => !arrow.removed).length, arrows.length));
+      if (!lives || arrows.every(arrow => arrow.removed)) finishLevel(lives > 0, false);
+      updateCounters();
+      saveRun();
+    }
+
+    function showHome(visible) {
+      ui.home.hidden = !visible;
+      ui["play-surface"].hidden = visible;
+      ui["continue-game"].disabled = !runStarted;
+      if (visible) {
+        clearGesture();
+        ui["impulse-intro"].hidden = true;
+        if (impulseState === "selecting") setImpulseState("ready");
+        if (!ui["zoom-hint"].hidden) zoomHintPending = true;
+        hideZoomHint();
+      } else drawCamera();
+    }
+
+    function startLevel(index, focusBoard = false) {
+      runStarted = true;
+      showHome(false);
+      loadLevel(index, focusBoard);
+      saveRun();
+    }
+
+    function showMenu(showLevels) {
+      const menu = ui["level-menu"];
+      clearGesture();
+      if (impulseState === "selecting") setImpulseState("ready");
+      hideZoomHint();
+      ui["pause-panel"].hidden = showLevels;
+      ui["level-panel"].hidden = !showLevels;
+      menu.setAttribute("aria-labelledby", showLevels ? "level-menu-title" : "pause-title");
+      if (!menu.open) menu.showModal();
+      (showLevels ? ui["levels-back"] : ui.resume).focus({ preventScroll: true });
+    }
+
+    function backFromLevels() {
+      if (ui.home.hidden) showMenu(false);
+      else ui["level-menu"].close();
+    }
+
+    function targetArrow(event) {
+      const node = event.target.closest("[data-arrow]");
+      return node ? arrows[Number(node.dataset.arrow)] : null;
+    }
+
+    levels.forEach((_, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "level-button";
+      button.innerHTML = '<span>' + (index + 1) + '</span><span class="level-check" aria-hidden="true"></span>';
+      button.addEventListener("click", () => {
+        ui["level-menu"].close();
+        if (!ui.home.hidden || current !== index || phase !== "playing") startLevel(index);
+      });
+      ui.levels.append(button);
+    });
+
+    for (let index = 0; index < maximumLives; index++) {
+      const heart = element("svg", { viewBox: "0 0 24 24", fill: "currentColor", class: "life-heart", "aria-hidden": "true" });
+      heart.append(element("path", { d: "M12 21 3.9 13.2a4.8 4.8 0 0 1 6.8-6.8L12 7.7l1.3-1.3a4.8 4.8 0 0 1 6.8 6.8Z" }));
+      ui.lives.append(heart);
+    }
+
+    ui.board.addEventListener("pointerdown", startGesture);
+    ui.board.addEventListener("pointermove", updateGesture);
+    for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
+      ui.board.addEventListener(type, endGesture);
+    }
+    ui.board.addEventListener("wheel", event => {
+      if (!arenaActive() || phase !== "playing") return;
+      event.preventDefault();
+      const point = pointerPosition(event);
+      const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? ui.board.clientHeight : 1);
+      moveCamera(point, point, Math.exp(-delta * .0025));
+    }, { passive: false });
+    new ResizeObserver(() => drawCamera()).observe(ui.board);
+    ui.pieces.addEventListener("click", event => {
+      if (event.detail === 0) void useArrow(targetArrow(event), false);
+    });
+    ui.pieces.addEventListener("focusin", event => {
+      if (!event.target.matches(":focus-visible") || pointers.size) return;
+      const arrow = targetArrow(event);
+      if (!arrow) return;
+      const rect = ui.board.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const [x, y] = arrow.line.points.at(-1);
+      const scale = baseScale * camera.zoom;
+      const halfWidth = Math.max(0, rect.width / 2 - 20) / scale;
+      const halfHeight = Math.max(0, rect.height / 2 - 20) / scale;
+      camera.x = clamp(camera.x, x - halfWidth, x + halfWidth);
+      camera.y = clamp(camera.y, y - halfHeight, y + halfHeight);
+      drawCamera(rect);
+    });
+    ui.pieces.addEventListener("keydown", event => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      if (!event.repeat) void useArrow(targetArrow(event), true);
+    });
+    ui["impulse-intro-close"].addEventListener("click", () => {
+      ui["impulse-intro"].hidden = true;
+    });
+    ui["impulse-toggle"].addEventListener("click", () => {
+      if (impulseState !== "ready" && impulseState !== "selecting") return;
+      const selecting = impulseState === "ready";
+      setImpulseState(selecting ? "selecting" : "ready");
+      setStatus(selecting ? "impulseSelect" : "chargeKept");
+    });
+    ui["end-action"].addEventListener("click", () => {
+      const next = phase === "won" && current < levels.length - 1 ? current + 1 : current;
+      startLevel(next, true);
+    });
+    ui["level-trigger"].addEventListener("click", () => showMenu(false));
+    ui.resume.addEventListener("click", () => ui["level-menu"].close());
+    ui["open-levels"].addEventListener("click", () => showMenu(true));
+    ui["levels-back"].addEventListener("click", backFromLevels);
+    ui["open-home"].addEventListener("click", () => {
+      ui["level-menu"].close();
+      showHome(true);
+      ui["continue-game"].focus({ preventScroll: true });
+    });
+    ui["new-game"].addEventListener("click", event => startLevel(0, event.detail === 0));
+    ui["continue-game"].addEventListener("click", event => {
+      showHome(false);
+      showImpulseIntro();
+      if (event.detail === 0) {
+        const target = phase === "playing" ? arrows.find(arrow => !arrow.removed).drawing.root : ui["end-action"];
+        target.focus({ preventScroll: true });
+      }
+    });
+    ui["home-levels"].addEventListener("click", () => showMenu(true));
+    for (const button of languageButtons) {
+      button.addEventListener("click", () => {
+        language = button.dataset.language;
+        try { localStorage.setItem(languageKey, JSON.stringify(language)); }
+        catch {}
+        applyLanguage();
+      });
+    }
+    document.addEventListener("keydown", event => {
+      if (event.key !== "Escape" || event.repeat || event.defaultPrevented) return;
+      const menu = ui["level-menu"];
+      if (menu.open) {
+        event.preventDefault();
+        if (!ui["level-panel"].hidden) backFromLevels();
+        else menu.close();
+      } else if (impulseState === "selecting") {
+        event.preventDefault();
+        setImpulseState("ready");
+      } else if (ui.home.hidden) {
+        event.preventDefault();
+        showMenu(false);
+      }
+    });
+
+    loadRun();
+    showHome(true);
+    applyLanguage();
+  </script>
+</body>
+</html>
